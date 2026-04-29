@@ -12,6 +12,7 @@ builder.Services.Configure<KafkaConsumerConfig>(
 builder.Services.AddKafkaConsumer(builder.Configuration);
 builder.Services.AddKafkaProcessor();
 builder.Services.AddSingleton<IKafkaConsumer, KafkaConsumer>();
+builder.Services.AddExcelDependence();
 
 builder.Services.AddHostedService<Worker>();
 
