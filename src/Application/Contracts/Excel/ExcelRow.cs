@@ -2,5 +2,5 @@
 
 public class ExcelRow
 {
-    public List<string?> Values { get; set; } = [];
+    public List<object?> Values { get; set; } = [];
 }

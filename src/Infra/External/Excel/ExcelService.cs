@@ -41,27 +41,30 @@ public class ExcelService : IExcelService
         return stream.ToArray();
     }
 
-    private static void PrepareHeader(IXLWorksheet? ws, ExcelSheet sheet)
+    private static void PrepareHeader(IXLWorksheet ws, ExcelSheet sheet)
     {
-        if (ws == null) return;
-
-        for (int col = 0; col < sheet.Columns.Count; col++)
-        {
-            ws.Cell(1, col + 1).Value = sheet.Columns[col];
-        }
+        ws.Cell(1, 1).InsertData(new[] { sheet.Columns });    
     }
 
-    private static void PrepareBody(IXLWorksheet? ws, ExcelSheet sheet)
+    private static void PrepareBody(IXLWorksheet ws, ExcelSheet sheet)
     {
-        if (ws == null) return;
 
-        for (int row = 0; row < sheet.Rows.Count; row++)
+        var data = new List<object[]>();
+        foreach (var row in sheet.Rows)
         {
-            for (int col = 0; col < sheet.Rows[row].Values.Count; col++)
+            var values = new object[sheet.Columns.Count];
+            for (int col = 0; col < sheet.Columns.Count; col++)
             {
-                ws.Cell(row + 2, col + 1).Value = sheet.Rows[row].Values[col]??string.Empty;
+                var value = col < row.Values.Count
+                            ? row.Values[col]
+                            : null;
+
+                values[col] = value ?? string.Empty;
             }
+
+            data.Add(values);
         }
+        ws.Cell(2, 1).InsertData(data);
     }
 
 }

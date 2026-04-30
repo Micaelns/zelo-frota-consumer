@@ -16,4 +16,8 @@
     <ProjectReference Include="..\Application\Application.csproj" />
     <ProjectReference Include="..\Infra\Infra.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Files\" />
+  </ItemGroup>
 </Project>
