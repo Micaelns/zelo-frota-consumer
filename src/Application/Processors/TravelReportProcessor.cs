@@ -1,15 +1,16 @@
 ﻿using Application.Contracts;
-using Application.Contracts.Excel;
+using Application.Mappers;
 using Microsoft.Extensions.Logging;
-using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 
 namespace Application.Processors;
 
-public class TravelReportProcessor(IFileStorage fileStorage, IExcelService excelService, ILogger<TravelReportProcessor> logger) : IEventProcessor
+public class TravelReportProcessor(IFileStorage fileStorage, IExcelService excelService, ITravelQuery travelQuery, ILogger<TravelReportProcessor> logger) : IEventProcessor
 {
     private readonly ILogger<TravelReportProcessor> _logger = logger;
     private readonly IFileStorage _fileStorage = fileStorage;
     private readonly IExcelService _excelService = excelService;
+    private readonly ITravelQuery _travelQuery = travelQuery;
 
     public async Task ProcessAsync(
         string message,
@@ -21,53 +22,31 @@ public class TravelReportProcessor(IFileStorage fileStorage, IExcelService excel
         }
         _logger.LogInformation("Processando mensagem: {@message}", message);
 
-        var data = PopulateDocument();
+        var messageDecoded = JsonSerializer.Deserialize<Contracts.Events.TravelReportEvent>(message);
+
+        if (messageDecoded is null) return;
+
+        var (startDate, endDate) = PreparePeriod(messageDecoded.MonthTravel, messageDecoded.YearTravel);
+        var listElements = await _travelQuery.ListTravelAsync(messageDecoded.VehicleId, messageDecoded.DestinationId, startDate, endDate);
+
+        var data = TravelMapper.ToExcelDocument(listElements.ToList());
         var file = _excelService.Generate(data);
         await _fileStorage.SaveAsync(data.Name, file);
 
         await Task.CompletedTask;
     }
 
-    public ExcelDocument PopulateDocument()
+    private static (DateTime? Start, DateTime? End) PreparePeriod(int? month, int? year)
     {
-        return new ExcelDocument()
-        {
-            Name = "JAN_2026.xlsx",
-            Sheets = {
-                new ExcelSheet { 
-                        Name = "Carro QKS 1C57",
-                        Columns = {"Data","Km_inicial","Km_final","Consumo_medio" },
-                        Rows =
-                        {
-                            new ExcelRow { Values = {"12/01/2026",10000,12000,2.5 } },
-                            new ExcelRow { Values = {"12/01/2026",12000,16000,2.2 } },
-                            new ExcelRow { Values = {"13/01/2026",16000,19000,2.7 } },
-                            new ExcelRow { Values = {"15/01/2026",19000,21000,2.5 } }
-                        }
-                },
-                new ExcelSheet {
-                        Name = "Carro KKK 1A00",
-                        Columns = {"Data","Km_inicial","Km_final","Consumo_medio" },
-                        Rows = 
-                        {
-                            new ExcelRow { Values = {"13/01/2026",11000,12000,2.5 } },
-                            new ExcelRow(),
-                            new ExcelRow { Values = {"14/01/2026", 12000, 19000 } },
-                            new ExcelRow { Values = {"14/01/2026" } }
-                        }
-                },
-                new ExcelSheet {
-                        Name = "Carro SSS 1B11",
-                        Columns = {"Data","Km_inicial","Km_final","Consumo_medio" },
-                        Rows = 
-                        {
-                            new ExcelRow { Values = {"16/01/2026",1000,1200,2.5 } },
-                            new ExcelRow { Values = {"16/01/2026",1200,2100,2 } },
-                            new ExcelRow { Values = {"17/01/2026",2100,3000,3 } },
-                            new ExcelRow { Values = {"19/01/2026",3000,5000,2.8 } }
-                        }
-                },
-            }
-        };
+        if (!year.HasValue) return (null, null);
+
+        if (month.HasValue && (month < 1 || month > 12)) return (null, null);
+
+        var start = new DateTime(year.Value, month ?? 1, 1);
+        var end = month.HasValue
+            ? start.AddMonths(1)
+            : start.AddYears(1);
+
+        return (start, end);
     }
 }

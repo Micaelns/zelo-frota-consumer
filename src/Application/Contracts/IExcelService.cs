@@ -1,9 +1,8 @@
-﻿using Application.Contracts.Excel;
+﻿using Domain.Entities;
 
 namespace Application.Contracts;
 
 public interface IExcelService
 {
-    public byte[] Generate();
     public byte[] Generate(ExcelDocument document);
 }

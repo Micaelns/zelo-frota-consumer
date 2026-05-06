@@ -1,7 +1,8 @@
+using Infra.Extensions;
 using Infra.External.Kafka;
 using Infra.External.Kafka.Consumer;
-using WorkerService;
 using Serilog;
+using WorkerService;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -26,6 +27,10 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Logging.ClearProviders();
 builder.Logging.AddSerilog();
+
+var sqlQueryString = builder.Configuration["connectionStringSqlServer"];
+builder.Services.AddContexts(sqlQueryString);
+builder.Services.ImplementsRepository();
 
 var host = builder.Build();
 
