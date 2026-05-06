@@ -1,4 +1,4 @@
-﻿namespace Application.Contracts.Excel;
+﻿namespace Domain.Entities;
 
 public class ExcelSheet
 {
