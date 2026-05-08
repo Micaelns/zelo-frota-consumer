@@ -17,33 +17,42 @@ public class TravelReportProcessor(IFileStorage fileStorage, IExcelService excel
         string message,
         CancellationToken cancellationToken)
     {
-        if (message == null)
+        try
         {
-            _logger.LogWarning("Mensagem nula ou invalida para processamento");
+            var messageDecoded = string.IsNullOrWhiteSpace(message) ? null : JsonSerializer.Deserialize<Contracts.Events.TravelReportEvent>(message);
+
+            if (messageDecoded is null)
+            {
+                _logger.LogWarning("Mensagem nula ou invalida para processamento");
+                return;
+            }
+
+            _logger.LogInformation("Processando mensagem: {message}", message);
+
+            if (await _idempotencyRepository.ThereIsAsync(messageDecoded.EventId))
+            {
+                _logger.LogWarning("Processamento da message já foi feito: {message}", message);
+                return;
+            }
+
+            await _idempotencyRepository.SaveAsync(messageDecoded.EventId, "TravelReportEvent", message);
+
+            var (startDate, endDate) = PreparePeriod(messageDecoded.MonthTravel, messageDecoded.YearTravel);
+            var listElements = await _travelQuery.ListTravelAsync(messageDecoded.VehicleId, messageDecoded.DestinationId, startDate, endDate);
+
+            var data = TravelMapper.ToExcelDocument(listElements.ToList());
+            var file = _excelService.Generate(data);
+            await _fileStorage.SaveAsync(data.Name, file);
+            await _idempotencyRepository.UpdateAsync(messageDecoded.EventId, DateTime.UtcNow);
+
+            await Task.CompletedTask;
         }
-        _logger.LogInformation("Processando mensagem: {message}", message);
-
-        var messageDecoded = JsonSerializer.Deserialize<Contracts.Events.TravelReportEvent>(message);
-
-        if (messageDecoded is null) return;
-
-        if (await _idempotencyRepository.ThereIsAsync(messageDecoded.EventId))
+        catch (JsonException ex)
         {
-            _logger.LogWarning("Processamento da message já foi feito: {message}", message);
-            return;
+            _logger.LogError(
+                ex,
+                "Erro ao desserializar mensagem");
         }
-
-        await _idempotencyRepository.SaveAsync(messageDecoded.EventId, "TravelReportEvent", message);
-
-        var (startDate, endDate) = PreparePeriod(messageDecoded.MonthTravel, messageDecoded.YearTravel);
-        var listElements = await _travelQuery.ListTravelAsync(messageDecoded.VehicleId, messageDecoded.DestinationId, startDate, endDate);
-
-        var data = TravelMapper.ToExcelDocument(listElements.ToList());
-        var file = _excelService.Generate(data);
-        await _fileStorage.SaveAsync(data.Name, file);
-        await _idempotencyRepository.UpdateAsync(messageDecoded.EventId, DateTime.UtcNow);
-
-        await Task.CompletedTask;
     }
 
     private static (DateTime? Start, DateTime? End) PreparePeriod(int? month, int? year)

@@ -18,7 +18,7 @@ public class TravelMapper
         {
             var sheet = new ExcelSheet
             {
-                Name = NormalizeSheetName(group.Key),
+                Name = group.Key,
                 Columns =
                 {
                     "Destino",
@@ -68,19 +68,5 @@ public class TravelMapper
         }
 
         return document;
-    }
-
-    private static string NormalizeSheetName(string name)
-    {
-        var invalidChars = new[] { '\\', '/', '?', '*', '[', ']' };
-
-        foreach (var c in invalidChars)
-        {
-            name = name.Replace(c, '_');
-        }
-
-        return name.Length > 31
-            ? name.Substring(0, 31)
-            : name;
     }
 }
